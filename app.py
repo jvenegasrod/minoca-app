@@ -2,23 +2,20 @@ import streamlit as st
 import math
 import matplotlib.pyplot as plt
 
-# ==============================
-# CONFIGURACIÓN GENERAL
-# ==============================
+# ======================================
+# CONFIGURACIÓN
+# ======================================
 
 st.set_page_config(page_title="Calculadora MINOCA", layout="centered")
 
 st.title("Calculadora clínica de probabilidad de MINOCA")
-
-st.markdown(
-    "Introduce los datos clínicos iniciales del paciente con infarto."
-)
+st.markdown("Introduce los datos clínicos iniciales del paciente con infarto.")
 
 st.divider()
 
-# ==============================
-# INPUTS
-# ==============================
+# ======================================
+# FUNCIÓN PARA PARSEAR NÚMEROS (vacío → 0)
+# ======================================
 
 def parse_float(x):
     if x == "" or x is None:
@@ -27,6 +24,10 @@ def parse_float(x):
         return float(str(x).replace(",", "."))
     except:
         return 0.0
+
+# ======================================
+# INPUTS
+# ======================================
 
 st.header("Datos clínicos")
 
@@ -48,12 +49,13 @@ colesterol_total = parse_float(st.text_input("Colesterol total"))
 pcr_normal = parse_float(st.text_input("PCR normal"))
 pcrus_al_ingreso = parse_float(st.text_input("PCR ultrasensible al ingreso"))
 il_6_a = parse_float(st.text_input("IL-6"))
-ritmo_en_ecg = parse_float(st.selectbox("Ritmo en ECG", [1, 2, 3, 4]))
-fevi_cat = parse_float(st.selectbox("FEVI categorizada", [1, 2, 3]))
 
-# ==============================
+ritmo_en_ecg = float(st.selectbox("Ritmo en ECG", [1, 2, 3, 4]))
+fevi_cat = float(st.selectbox("FEVI categorizada", [1, 2, 3]))
+
+# ======================================
 # CODIFICACIÓN
-# ==============================
+# ======================================
 
 sexo_val = 1 if sexo == "Hombre" else 2
 tabaco_val = 1 if tabaco == "Fumador" else 0
@@ -63,9 +65,9 @@ dislipemia_val = 1 if dislipemia == "Sí" else 0
 irc_previo_val = 1 if irc_previo == "Sí" else 0
 ictus_final_val = 1 if ictus_final == "Sí" else 0
 
-# ==============================
+# ======================================
 # COEFICIENTES
-# ==============================
+# ======================================
 
 COEF = {
     "edad": 0.198357,
@@ -89,9 +91,9 @@ COEF = {
     "fevi_cat": 0.301552
 }
 
-# ==============================
+# ======================================
 # SCORE
-# ==============================
+# ======================================
 
 score = (
     edad * COEF["edad"] +
@@ -115,19 +117,30 @@ score = (
     fevi_cat * COEF["fevi_cat"]
 )
 
-# ==============================
-# CALIBRACIÓN (tus valores reales)
-# ==============================
+# ======================================
+# CALIBRACIÓN ORIGINAL (DATASET BALANCEADO)
+# ======================================
 
 a = 0.6233327289350132
 b = -0.0009401927501036586
 
-prob_minoca = 1 / (1 + math.exp(-(a + b * score)))
+prob_model = 1 / (1 + math.exp(-(a + b * score)))
+
+# ======================================
+# CORRECCIÓN POR PREVALENCIA REAL
+# ======================================
+
+pi_real = 0.10  # Ajustar según prevalencia clínica real
+
+odds_model = prob_model / (1 - prob_model)
+odds_corrected = odds_model * (pi_real / (1 - pi_real))
+
+prob_minoca = odds_corrected / (1 + odds_corrected)
 prob_obstructivo = 1 - prob_minoca
 
-# ==============================
+# ======================================
 # RESULTADOS
-# ==============================
+# ======================================
 
 st.divider()
 st.header("Resultado")
@@ -135,9 +148,9 @@ st.header("Resultado")
 st.metric("Probabilidad MINOCA", f"{prob_minoca*100:.1f} %")
 st.metric("Probabilidad IAM obstructivo", f"{prob_obstructivo*100:.1f} %")
 
-# ==============================
-# BOXPLOT VISUAL
-# ==============================
+# ======================================
+# BOXPLOT
+# ======================================
 
 stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13, 'whislo': 83.40, 'whishi': 2684.25}
 stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23, 'whislo': 91.66, 'whishi': 896.16}
@@ -156,6 +169,4 @@ ax.legend()
 
 st.pyplot(fig)
 
-st.caption(
-    "⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico."
-)
+st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
