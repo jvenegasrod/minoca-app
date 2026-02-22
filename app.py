@@ -1,6 +1,7 @@
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
+import numpy as np
 
 # ======================================
 # CONFIGURACIÓN
@@ -8,13 +9,33 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Calculadora MINOCA", layout="centered")
 
+# ======================================
+# ESTILO PERSONALIZADO
+# ======================================
+
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #F5F2EA;
+    }
+    .block-container {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("Calculadora clínica de probabilidad de MINOCA")
 st.markdown("Introduce los datos clínicos iniciales del paciente con infarto.")
-
 st.divider()
 
 # ======================================
-# FUNCIÓN PARA PARSEAR NÚMEROS (vacío → 0)
+# FUNCIONES
 # ======================================
 
 def parse_float(x):
@@ -24,6 +45,9 @@ def parse_float(x):
         return float(str(x).replace(",", "."))
     except:
         return 0.0
+
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
 
 # ======================================
 # INPUTS
@@ -95,42 +119,40 @@ COEF = {
 # SCORE
 # ======================================
 
-score = (
-    edad * COEF["edad"] +
-    sexo_val * COEF["sexo"] +
-    tabaco_val * COEF["tabaco"] +
-    diabetes_val * COEF["diabetes"] +
-    hta_val * COEF["hta"] +
-    dislipemia_val * COEF["dislipemia"] +
-    irc_previo_val * COEF["irc_previo"] +
-    ictus_final_val * COEF["ictus_final"] +
-    troponina_ths * COEF["troponina_ths"] +
-    hb * COEF["hb"] +
-    ck * COEF["ck"] +
-    frecuencia_cardiaca * COEF["frecuencia_cardiaca"] +
-    tas * COEF["tas"] +
-    ritmo_en_ecg * COEF["ritmo_en_ecg"] +
-    colesterol_total * COEF["colesterol_total"] +
-    pcr_normal * COEF["pcr_normal"] +
-    pcrus_al_ingreso * COEF["pcrus_al_ingreso"] +
-    il_6_a * COEF["il_6_a"] +
-    fevi_cat * COEF["fevi_cat"]
-)
+score_components = {
+    "Edad": edad * COEF["edad"],
+    "Sexo": sexo_val * COEF["sexo"],
+    "Tabaco": tabaco_val * COEF["tabaco"],
+    "Diabetes": diabetes_val * COEF["diabetes"],
+    "HTA": hta_val * COEF["hta"],
+    "Dislipemia": dislipemia_val * COEF["dislipemia"],
+    "IRC previa": irc_previo_val * COEF["irc_previo"],
+    "Ictus previo": ictus_final_val * COEF["ictus_final"],
+    "Troponina": troponina_ths * COEF["troponina_ths"],
+    "Hemoglobina": hb * COEF["hb"],
+    "CK": ck * COEF["ck"],
+    "Frecuencia cardiaca": frecuencia_cardiaca * COEF["frecuencia_cardiaca"],
+    "TAS": tas * COEF["tas"],
+    "Ritmo ECG": ritmo_en_ecg * COEF["ritmo_en_ecg"],
+    "Colesterol": colesterol_total * COEF["colesterol_total"],
+    "PCR normal": pcr_normal * COEF["pcr_normal"],
+    "PCR ultrasensible": pcrus_al_ingreso * COEF["pcrus_al_ingreso"],
+    "IL-6": il_6_a * COEF["il_6_a"],
+    "FEVI": fevi_cat * COEF["fevi_cat"]
+}
+
+score = sum(score_components.values())
 
 # ======================================
-# CALIBRACIÓN ORIGINAL (DATASET BALANCEADO)
+# CALIBRACIÓN + PREVALENCIA
 # ======================================
 
 a = 0.6233327289350132
 b = -0.0009401927501036586
 
-prob_model = 1 / (1 + math.exp(-(a + b * score)))
+prob_model = sigmoid(a + b * score)
 
-# ======================================
-# CORRECCIÓN POR PREVALENCIA REAL
-# ======================================
-
-pi_real = 0.10  # Ajustar según prevalencia clínica real
+pi_real = 0.10
 
 odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
@@ -149,24 +171,29 @@ st.metric("Probabilidad MINOCA", f"{prob_minoca*100:.1f} %")
 st.metric("Probabilidad IAM obstructivo", f"{prob_obstructivo*100:.1f} %")
 
 # ======================================
-# BOXPLOT
+# TERMÓMETRO
 # ======================================
 
-stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13, 'whislo': 83.40, 'whishi': 2684.25}
-stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23, 'whislo': 91.66, 'whishi': 896.16}
+st.subheader("Nivel de riesgo")
 
-fig, ax = plt.subplots()
+fig2, ax2 = plt.subplots(figsize=(6,1))
+ax2.barh(0, prob_minoca, color="red")
+ax2.set_xlim(0,1)
+ax2.set_yticks([])
+ax2.set_xlabel("Probabilidad MINOCA")
+ax2.axvline(0.10, color="green", linestyle="--")
+ax2.axvline(0.30, color="orange", linestyle="--")
+st.pyplot(fig2)
 
-box_data = [
-    dict(label="Obstructivo", **stats0),
-    dict(label="MINOCA", **stats1)
-]
+# ======================================
+# CONTRIBUCIONES
+# ======================================
 
-ax.bxp(box_data, showfliers=False)
-ax.axhline(score, color="red", linestyle="--", label="Score paciente")
-ax.set_ylabel("Score")
-ax.legend()
+st.subheader("Principales contribuyentes al score")
 
-st.pyplot(fig)
+sorted_contrib = sorted(score_components.items(), key=lambda x: abs(x[1]), reverse=True)
+
+for var, val in sorted_contrib[:5]:
+    st.write(f"{var}: {val:.2f}")
 
 st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
