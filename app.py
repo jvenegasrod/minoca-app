@@ -10,7 +10,7 @@ import numpy as np
 st.set_page_config(page_title="Calculadora MINOCA", layout="centered")
 
 # ======================================
-# ESTILO PERSONALIZADO
+# ESTILO VISUAL (BEIGE + TARJETA BLANCA)
 # ======================================
 
 st.markdown(
@@ -184,6 +184,29 @@ ax2.set_xlabel("Probabilidad MINOCA")
 ax2.axvline(0.10, color="green", linestyle="--")
 ax2.axvline(0.30, color="orange", linestyle="--")
 st.pyplot(fig2)
+
+# ======================================
+# BOXPLOT REAL
+# ======================================
+
+st.subheader("Posición del paciente en la distribución del score")
+
+stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13, 'whislo': 83.40, 'whishi': 2684.25}
+stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23, 'whislo': 91.66, 'whishi': 896.16}
+
+fig, ax = plt.subplots()
+
+box_data = [
+    dict(label="Obstructivo", **stats0),
+    dict(label="MINOCA", **stats1)
+]
+
+ax.bxp(box_data, showfliers=False)
+ax.axhline(score, color="red", linestyle="--", label="Score paciente")
+ax.set_ylabel("Score")
+ax.legend()
+
+st.pyplot(fig)
 
 # ======================================
 # CONTRIBUCIONES
