@@ -1,7 +1,6 @@
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
-import numpy as np
 
 # ======================================
 # CONFIGURACIÓN
@@ -10,25 +9,20 @@ import numpy as np
 st.set_page_config(page_title="Calculadora MINOCA", layout="centered")
 
 # ======================================
-# ESTILO VISUAL
+# ESTILO
 # ======================================
 
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #F5F2EA;
-    }
-    .block-container {
-        background-color: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<style>
+.stApp { background-color: #F5F2EA; }
+.block-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("Calculadora clínica de probabilidad de MINOCA")
 st.markdown("Introduce los datos clínicos iniciales del paciente con infarto.")
@@ -116,30 +110,30 @@ COEF = {
 }
 
 # ======================================
-# SCORE
+# SCORE ORIGINAL (NO TOCAR)
 # ======================================
 
-score = (
-    edad * COEF["edad"] +
-    sexo_val * COEF["sexo"] +
-    tabaco_val * COEF["tabaco"] +
-    diabetes_val * COEF["diabetes"] +
-    hta_val * COEF["hta"] +
-    dislipemia_val * COEF["dislipemia"] +
-    irc_previo_val * COEF["irc_previo"] +
-    ictus_final_val * COEF["ictus_final"] +
-    troponina_ths * COEF["troponina_ths"] +
-    hb * COEF["hb"] +
-    ck * COEF["ck"] +
-    frecuencia_cardiaca * COEF["frecuencia_cardiaca"] +
-    tas * COEF["tas"] +
-    ritmo_en_ecg * COEF["ritmo_en_ecg"] +
-    colesterol_total * COEF["colesterol_total"] +
-    pcr_normal * COEF["pcr_normal"] +
-    pcrus_al_ingreso * COEF["pcrus_al_ingreso"] +
-    il_6_a * COEF["il_6_a"] +
+score = sum([
+    edad * COEF["edad"],
+    sexo_val * COEF["sexo"],
+    tabaco_val * COEF["tabaco"],
+    diabetes_val * COEF["diabetes"],
+    hta_val * COEF["hta"],
+    dislipemia_val * COEF["dislipemia"],
+    irc_previo_val * COEF["irc_previo"],
+    ictus_final_val * COEF["ictus_final"],
+    troponina_ths * COEF["troponina_ths"],
+    hb * COEF["hb"],
+    ck * COEF["ck"],
+    frecuencia_cardiaca * COEF["frecuencia_cardiaca"],
+    tas * COEF["tas"],
+    ritmo_en_ecg * COEF["ritmo_en_ecg"],
+    colesterol_total * COEF["colesterol_total"],
+    pcr_normal * COEF["pcr_normal"],
+    pcrus_al_ingreso * COEF["pcrus_al_ingreso"],
+    il_6_a * COEF["il_6_a"],
     fevi_cat * COEF["fevi_cat"]
-)
+])
 
 # ======================================
 # MODELO ORIGINAL
@@ -151,22 +145,17 @@ b = -0.0009401927501036586
 prob_model = sigmoid(a + b * score)
 
 pi_real = 0.10
-
 odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
 
 prob_minoca = odds_corrected / (1 + odds_corrected)
 
 # ======================================
-# BOXPLOT STATS
+# DISTRIBUCIÓN CLÍNICA
 # ======================================
 
 stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13}
 stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23}
-
-# ======================================
-# NUEVA LÓGICA HÍBRIDA
-# ======================================
 
 med_minoca = stats1['med']
 med_obstructivo = stats0['med']
@@ -180,18 +169,30 @@ aff_obstructivo = 1 / (dist_obstructivo + 1)
 total_aff = aff_minoca + aff_obstructivo
 aff_minoca /= total_aff
 
-# combinación
-peso_modelo = 0.6
-peso_dist = 0.4
+# ======================================
+# COMBINACIÓN (CLAVE)
+# ======================================
+
+peso_modelo = 0.3
+peso_dist = 0.7
 
 prob_minoca = (peso_modelo * prob_minoca) + (peso_dist * aff_minoca)
 
-# ajuste por IQR
-if stats1['q1'] <= score <= stats1['q3']:
-    prob_minoca += 0.15
+# ======================================
+# OVERRIDE CLÍNICO (CLAVE)
+# ======================================
 
-if stats0['q1'] <= score <= stats0['q3']:
-    prob_minoca -= 0.15
+en_box_minoca = stats1['q1'] <= score <= stats1['q3']
+en_box_obstructivo = stats0['q1'] <= score <= stats0['q3']
+
+cerca_minoca = dist_minoca < dist_obstructivo
+cerca_obstructivo = dist_obstructivo < dist_minoca
+
+if en_box_minoca and cerca_minoca:
+    prob_minoca = max(prob_minoca, 0.7)
+
+if en_box_obstructivo and cerca_obstructivo:
+    prob_minoca = min(prob_minoca, 0.3)
 
 # límites
 prob_minoca = max(0, min(1, prob_minoca))
@@ -208,18 +209,14 @@ st.metric("Probabilidad MINOCA", f"{prob_minoca*100:.1f} %")
 st.metric("Probabilidad IAM obstructivo", f"{prob_obstructivo*100:.1f} %")
 
 # ======================================
-# TERMÓMETRO
+# VISUAL
 # ======================================
-
-st.subheader("Nivel de riesgo")
 
 fig2, ax2 = plt.subplots(figsize=(6,1))
 ax2.barh(0, prob_minoca)
 ax2.set_xlim(0,1)
 ax2.set_yticks([])
 ax2.set_xlabel("Probabilidad MINOCA")
-ax2.axvline(0.10, linestyle="--")
-ax2.axvline(0.30, linestyle="--")
 st.pyplot(fig2)
 
 # ======================================
@@ -245,15 +242,4 @@ ax.legend()
 
 st.pyplot(fig)
 
-# ======================================
-# CONTRIBUCIONES
-# ======================================
-
-st.subheader("Principales contribuyentes al score")
-
-sorted_contrib = sorted(score_components.items(), key=lambda x: abs(x[1]), reverse=True)
-
-for var, val in sorted_contrib[:5]:
-    st.write(f"{var}: {val:.2f}")
-
-st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
+st.caption("⚠️ Modelo híbrido: regresión + distribución clínica (ajustado).")
