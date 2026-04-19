@@ -48,7 +48,7 @@ def standard_scale(X, mean, scale):
     return [(x - m) / s if s != 0 else 0 for x, m, s in zip(X, mean, scale)]
 
 # ======================================
-# SCALER MANUAL (StandardScaler)
+# SCALER MANUAL (20 VARIABLES)
 # ======================================
 
 mean = [
@@ -114,7 +114,7 @@ ictus_final_val = 1 if ictus_final == "Sí" else 0
 fa_flutter_val = 1 if fa_flutter == "Sí" else 0
 
 # ======================================
-# VECTOR DE INPUT
+# VECTOR DE INPUT (ORDEN EXACTO DEL MODELO)
 # ======================================
 
 X_input = np.array([[
@@ -200,7 +200,7 @@ st.metric("Valor del score", f"{score:.2f}")
 
 st.subheader("Nivel de riesgo")
 
-fig2, ax2 = plt.subplots(figsize=(6,1))
+fig2, ax2 = plt.subplots(figsize=(6, 1))
 ax2.barh(0, prob_minoca, color="red")
 ax2.set_xlim(0, 1)
 ax2.set_yticks([])
