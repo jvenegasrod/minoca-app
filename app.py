@@ -242,4 +242,4 @@ ax.legend()
 
 st.pyplot(fig)
 
-st.caption("⚠️ Modelo híbrido: regresión + distribución clínica (ajustado).")
+st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
