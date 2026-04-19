@@ -110,7 +110,7 @@ COEF = {
 }
 
 # ======================================
-# SCORE ORIGINAL (NO TOCAR)
+# SCORE
 # ======================================
 
 score = sum([
@@ -136,7 +136,7 @@ score = sum([
 ])
 
 # ======================================
-# MODELO ORIGINAL
+# MODELO
 # ======================================
 
 a = 0.6233327289350132
@@ -151,7 +151,7 @@ odds_corrected = odds_model * (pi_real / (1 - pi_real))
 prob_minoca = odds_corrected / (1 + odds_corrected)
 
 # ======================================
-# DISTRIBUCIÓN CLÍNICA
+# DISTRIBUCIÓN
 # ======================================
 
 stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13}
@@ -170,7 +170,7 @@ total_aff = aff_minoca + aff_obstructivo
 aff_minoca /= total_aff
 
 # ======================================
-# COMBINACIÓN (CLAVE)
+# COMBINACIÓN
 # ======================================
 
 peso_modelo = 0.3
@@ -179,7 +179,7 @@ peso_dist = 0.7
 prob_minoca = (peso_modelo * prob_minoca) + (peso_dist * aff_minoca)
 
 # ======================================
-# OVERRIDE CLÍNICO (CLAVE)
+# OVERRIDE
 # ======================================
 
 en_box_minoca = stats1['q1'] <= score <= stats1['q3']
@@ -194,7 +194,6 @@ if en_box_minoca and cerca_minoca:
 if en_box_obstructivo and cerca_obstructivo:
     prob_minoca = min(prob_minoca, 0.3)
 
-# límites
 prob_minoca = max(0, min(1, prob_minoca))
 prob_obstructivo = 1 - prob_minoca
 
@@ -208,16 +207,62 @@ st.header("Resultado")
 st.metric("Probabilidad MINOCA", f"{prob_minoca*100:.1f} %")
 st.metric("Probabilidad IAM obstructivo", f"{prob_obstructivo*100:.1f} %")
 
+st.subheader("Score total")
+st.metric("Valor del score", f"{score:.2f}")
+
 # ======================================
-# VISUAL
+# TERMÓMETRO
 # ======================================
 
+st.subheader("Nivel de riesgo")
+
 fig2, ax2 = plt.subplots(figsize=(6,1))
-ax2.barh(0, prob_minoca)
+ax2.barh(0, prob_minoca, color="red")
 ax2.set_xlim(0,1)
 ax2.set_yticks([])
 ax2.set_xlabel("Probabilidad MINOCA")
+ax2.axvline(0.10, color="green", linestyle="--", label="Bajo")
+ax2.axvline(0.30, color="orange", linestyle="--", label="Intermedio")
+ax2.legend(loc="upper right")
+
 st.pyplot(fig2)
+
+# ======================================
+# CONTRIBUCIONES
+# ======================================
+
+st.subheader("Variables que más contribuyen")
+
+contribuciones = {
+    "Edad": edad * COEF["edad"],
+    "Sexo": sexo_val * COEF["sexo"],
+    "Tabaco": tabaco_val * COEF["tabaco"],
+    "Diabetes": diabetes_val * COEF["diabetes"],
+    "HTA": hta_val * COEF["hta"],
+    "Dislipemia": dislipemia_val * COEF["dislipemia"],
+    "IRC": irc_previo_val * COEF["irc_previo"],
+    "Ictus": ictus_final_val * COEF["ictus_final"],
+    "Troponina": troponina_ths * COEF["troponina_ths"],
+    "Hb": hb * COEF["hb"],
+    "CK": ck * COEF["ck"],
+    "FC": frecuencia_cardiaca * COEF["frecuencia_cardiaca"],
+    "TAS": tas * COEF["tas"],
+    "ECG": ritmo_en_ecg * COEF["ritmo_en_ecg"],
+    "Colesterol": colesterol_total * COEF["colesterol_total"],
+    "PCR": pcr_normal * COEF["pcr_normal"],
+    "PCR-us": pcrus_al_ingreso * COEF["pcrus_al_ingreso"],
+    "IL-6": il_6_a * COEF["il_6_a"],
+    "FEVI": fevi_cat * COEF["fevi_cat"]
+}
+
+contrib_ordenadas = dict(sorted(contribuciones.items(), key=lambda x: abs(x[1]), reverse=True))
+
+fig3, ax3 = plt.subplots(figsize=(6,4))
+ax3.barh(list(contrib_ordenadas.keys())[:8], list(contrib_ordenadas.values())[:8])
+ax3.invert_yaxis()
+ax3.set_xlabel("Contribución al score")
+
+st.pyplot(fig3)
 
 # ======================================
 # BOXPLOT
@@ -236,7 +281,7 @@ box_data = [
 ]
 
 ax.bxp(box_data, showfliers=False)
-ax.axhline(score, linestyle="--", label="Score paciente")
+ax.axhline(score, color="red", linestyle="--", label="Score paciente")
 ax.set_ylabel("Score")
 ax.legend()
 
