@@ -1,9 +1,7 @@
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
-import pickle
 import numpy as np
-import os
 
 # ======================================
 # CONFIGURACIÓN
@@ -32,14 +30,6 @@ st.markdown("Introduce los datos clínicos iniciales del paciente con infarto.")
 st.divider()
 
 # ======================================
-# CARGAR SCALER
-# ======================================
-
-BASE_DIR = os.path.dirname(__file__)
-scaler_path = os.path.join(BASE_DIR, "scaler.pkl")
-scaler = pickle.load(open(scaler_path, "rb"))
-
-# ======================================
 # FUNCIONES
 # ======================================
 
@@ -53,6 +43,33 @@ def parse_float(x):
 
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
+
+def standard_scale(X, mean, scale):
+    return [(x - m) / s if s != 0 else 0 for x, m, s in zip(X, mean, scale)]
+
+# ======================================
+# SCALER MANUAL (StandardScaler)
+# ======================================
+
+mean = [
+    -0.036719805255204685, 0.37371487672802645, -0.037245115329270044,
+    0.3831479423974633, -0.352703959052168, -0.0310957469756243,
+    0.09592671687721055, 0.10200011935525558, 0.07880480531458219,
+    0.6439905310506593, 0.04576804683337029, 0.6413664724706669,
+    0.06120679901294951, 0.04417647682732945, 0.14500063939315203,
+    0.05137186727852011, 0.8083621989745011, 0.40897606475162984,
+    0.415764688004906, 0.025172529736040016
+]
+
+scale = [
+    0.6806373781839579, 0.4463381328397996, 0.5085205389906217,
+    0.5592998198177509, 0.4454544886937723, 0.46365220669395696,
+    0.2738765147978888, 0.27888309014747065, 0.25033848421784255,
+    2.3571431098781552, 1.2484655049454723, 1.8075454751071631,
+    0.8549965566770581, 0.8054317324831691, 0.44978064776809584,
+    0.816740582760879, 3.067299703648678, 1.4045030066428585,
+    1.9908200370196334, 0.590764625120386
+]
 
 # ======================================
 # INPUTS
@@ -68,7 +85,7 @@ hta = st.selectbox("Hipertensión arterial", ["No", "Sí"])
 dislipemia = st.selectbox("Dislipemia", ["No", "Sí"])
 irc_previo = st.selectbox("Insuficiencia renal crónica previa", ["No", "Sí"])
 ictus_final = st.selectbox("Ictus previo", ["No", "Sí"])
-fa_flutter = st.selectbox("FA/Flutter auricular", ["No", "Sí"])  # NUEVO
+fa_flutter = st.selectbox("FA/Flutter auricular", ["No", "Sí"])
 
 troponina_ths = parse_float(st.text_input("Troponina T hs"))
 hb = parse_float(st.text_input("Hemoglobina"))
@@ -97,7 +114,7 @@ ictus_final_val = 1 if ictus_final == "Sí" else 0
 fa_flutter_val = 1 if fa_flutter == "Sí" else 0
 
 # ======================================
-# VECTOR DE INPUT (ORDEN EXACTO DEL MODELO)
+# VECTOR DE INPUT
 # ======================================
 
 X_input = np.array([[
@@ -119,45 +136,18 @@ X_input = np.array([[
     pcr_normal,
     pcrus_al_ingreso,
     il_6_a,
-    fa_flutter_val,   # ← IMPORTANTE
+    fa_flutter_val,
     fevi_cat
 ]])
 
 # ======================================
 # ESCALADO
 # ======================================
-# ======================================
-# SCALER MANUAL (StandardScaler)
-# ======================================
-
-mean = [
--0.036719805255204685, 0.37371487672802645, -0.037245115329270044,
-0.3831479423974633, -0.352703959052168, -0.0310957469756243,
-0.09592671687721055, 0.10200011935525558, 0.07880480531458219,
-0.6439905310506593, 0.04576804683337029, 0.6413664724706669,
-0.06120679901294951, 0.04417647682732945, 0.14500063939315203,
-0.05137186727852011, 0.8083621989745011, 0.40897606475162984,
-0.415764688004906, 0.025172529736040016
-]
-
-scale = [
-0.6806373781839579, 0.4463381328397996, 0.5085205389906217,
-0.5592998198177509, 0.4454544886937723, 0.46365220669395696,
-0.2738765147978888, 0.27888309014747065, 0.25033848421784255,
-2.3571431098781552, 1.2484655049454723, 1.8075454751071631,
-0.8549965566770581, 0.8054317324831691, 0.44978064776809584,
-0.816740582760879, 3.067299703648678, 1.4045030066428585,
-1.9908200370196334, 0.590764625120386
-]
-
-def standard_scale(X, mean, scale):
-    return [(x - m) / s if s != 0 else 0 for x, m, s in zip(X, mean, scale)]
-
 
 X_scaled = np.array(standard_scale(X_input[0], mean, scale))
 
 # ======================================
-# COEFICIENTES (20 VARIABLES)
+# COEFICIENTES
 # ======================================
 
 COEF = [
@@ -165,16 +155,14 @@ COEF = [
     0.395783, 0.070659, 0.038478, 0.405527,
     0.134931, 0.208151, 0.149204, 0.132517,
     0.163148, 0.193213, 0.098491, 0.130386,
-    0.052608,
-    0.0,        
-    0.301552
+    0.052608, 0.0, 0.301552
 ]
 
 # ======================================
 # SCORE
 # ======================================
 
-score = sum([x * c for x, c in zip(X_scaled, COEF)])
+score = sum(x * c for x, c in zip(X_scaled, COEF))
 
 # ======================================
 # MODELO
@@ -214,7 +202,7 @@ st.subheader("Nivel de riesgo")
 
 fig2, ax2 = plt.subplots(figsize=(6,1))
 ax2.barh(0, prob_minoca, color="red")
-ax2.set_xlim(0,1)
+ax2.set_xlim(0, 1)
 ax2.set_yticks([])
 ax2.set_xlabel("Probabilidad MINOCA")
 ax2.axvline(0.10, color="green", linestyle="--")
