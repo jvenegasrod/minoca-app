@@ -127,7 +127,7 @@ X_input = np.array([[
 # ESCALADO
 # ======================================
 
-X_scaled = scaler.transform(X_input)[0]
+X_scaled = np.array(standard_scale(X_input[0], mean, scale))
 
 # ======================================
 # COEFICIENTES (20 VARIABLES)
