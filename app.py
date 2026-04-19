@@ -10,7 +10,7 @@ import numpy as np
 st.set_page_config(page_title="Calculadora MINOCA", layout="centered")
 
 # ======================================
-# ESTILO VISUAL (BEIGE + TARJETA BLANCA)
+# ESTILO VISUAL
 # ======================================
 
 st.markdown(
@@ -119,32 +119,30 @@ COEF = {
 # SCORE
 # ======================================
 
-score_components = {
-    "Edad": edad * COEF["edad"],
-    "Sexo": sexo_val * COEF["sexo"],
-    "Tabaco": tabaco_val * COEF["tabaco"],
-    "Diabetes": diabetes_val * COEF["diabetes"],
-    "HTA": hta_val * COEF["hta"],
-    "Dislipemia": dislipemia_val * COEF["dislipemia"],
-    "IRC previa": irc_previo_val * COEF["irc_previo"],
-    "Ictus previo": ictus_final_val * COEF["ictus_final"],
-    "Troponina": troponina_ths * COEF["troponina_ths"],
-    "Hemoglobina": hb * COEF["hb"],
-    "CK": ck * COEF["ck"],
-    "Frecuencia cardiaca": frecuencia_cardiaca * COEF["frecuencia_cardiaca"],
-    "TAS": tas * COEF["tas"],
-    "Ritmo ECG": ritmo_en_ecg * COEF["ritmo_en_ecg"],
-    "Colesterol": colesterol_total * COEF["colesterol_total"],
-    "PCR normal": pcr_normal * COEF["pcr_normal"],
-    "PCR ultrasensible": pcrus_al_ingreso * COEF["pcrus_al_ingreso"],
-    "IL-6": il_6_a * COEF["il_6_a"],
-    "FEVI": fevi_cat * COEF["fevi_cat"]
-}
-
-score = sum(score_components.values())
+score = (
+    edad * COEF["edad"] +
+    sexo_val * COEF["sexo"] +
+    tabaco_val * COEF["tabaco"] +
+    diabetes_val * COEF["diabetes"] +
+    hta_val * COEF["hta"] +
+    dislipemia_val * COEF["dislipemia"] +
+    irc_previo_val * COEF["irc_previo"] +
+    ictus_final_val * COEF["ictus_final"] +
+    troponina_ths * COEF["troponina_ths"] +
+    hb * COEF["hb"] +
+    ck * COEF["ck"] +
+    frecuencia_cardiaca * COEF["frecuencia_cardiaca"] +
+    tas * COEF["tas"] +
+    ritmo_en_ecg * COEF["ritmo_en_ecg"] +
+    colesterol_total * COEF["colesterol_total"] +
+    pcr_normal * COEF["pcr_normal"] +
+    pcrus_al_ingreso * COEF["pcrus_al_ingreso"] +
+    il_6_a * COEF["il_6_a"] +
+    fevi_cat * COEF["fevi_cat"]
+)
 
 # ======================================
-# CALIBRACIÓN + PREVALENCIA
+# MODELO ORIGINAL
 # ======================================
 
 a = 0.6233327289350132
@@ -158,6 +156,45 @@ odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
 
 prob_minoca = odds_corrected / (1 + odds_corrected)
+
+# ======================================
+# BOXPLOT STATS
+# ======================================
+
+stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13}
+stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23}
+
+# ======================================
+# NUEVA LÓGICA HÍBRIDA
+# ======================================
+
+med_minoca = stats1['med']
+med_obstructivo = stats0['med']
+
+dist_minoca = abs(score - med_minoca)
+dist_obstructivo = abs(score - med_obstructivo)
+
+aff_minoca = 1 / (dist_minoca + 1)
+aff_obstructivo = 1 / (dist_obstructivo + 1)
+
+total_aff = aff_minoca + aff_obstructivo
+aff_minoca /= total_aff
+
+# combinación
+peso_modelo = 0.6
+peso_dist = 0.4
+
+prob_minoca = (peso_modelo * prob_minoca) + (peso_dist * aff_minoca)
+
+# ajuste por IQR
+if stats1['q1'] <= score <= stats1['q3']:
+    prob_minoca += 0.15
+
+if stats0['q1'] <= score <= stats0['q3']:
+    prob_minoca -= 0.15
+
+# límites
+prob_minoca = max(0, min(1, prob_minoca))
 prob_obstructivo = 1 - prob_minoca
 
 # ======================================
@@ -177,32 +214,32 @@ st.metric("Probabilidad IAM obstructivo", f"{prob_obstructivo*100:.1f} %")
 st.subheader("Nivel de riesgo")
 
 fig2, ax2 = plt.subplots(figsize=(6,1))
-ax2.barh(0, prob_minoca, color="red")
+ax2.barh(0, prob_minoca)
 ax2.set_xlim(0,1)
 ax2.set_yticks([])
 ax2.set_xlabel("Probabilidad MINOCA")
-ax2.axvline(0.10, color="green", linestyle="--")
-ax2.axvline(0.30, color="orange", linestyle="--")
+ax2.axvline(0.10, linestyle="--")
+ax2.axvline(0.30, linestyle="--")
 st.pyplot(fig2)
 
 # ======================================
-# BOXPLOT REAL
+# BOXPLOT
 # ======================================
 
 st.subheader("Posición del paciente en la distribución del score")
 
-stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13, 'whislo': 83.40, 'whishi': 2684.25}
-stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23, 'whislo': 91.66, 'whishi': 896.16}
+stats0_full = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13, 'whislo': 83.40, 'whishi': 2684.25}
+stats1_full = {'q1': 177.95, 'med': 293.23, 'q3': 465.23, 'whislo': 91.66, 'whishi': 896.16}
 
 fig, ax = plt.subplots()
 
 box_data = [
-    dict(label="Obstructivo", **stats0),
-    dict(label="MINOCA", **stats1)
+    dict(label="Obstructivo", **stats0_full),
+    dict(label="MINOCA", **stats1_full)
 ]
 
 ax.bxp(box_data, showfliers=False)
-ax.axhline(score, color="red", linestyle="--", label="Score paciente")
+ax.axhline(score, linestyle="--", label="Score paciente")
 ax.set_ylabel("Score")
 ax.legend()
 
