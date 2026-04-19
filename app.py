@@ -114,7 +114,7 @@ ictus_final_val = 1 if ictus_final == "Sí" else 0
 fa_flutter_val = 1 if fa_flutter == "Sí" else 0
 
 # ======================================
-# VECTOR DE INPUT (ORDEN EXACTO DEL MODELO)
+# VECTOR DE INPUT
 # ======================================
 
 X_input = np.array([[
@@ -158,6 +158,13 @@ COEF = [
     0.052608, 0.0, 0.301552
 ]
 
+FEATURE_NAMES = [
+    "Edad", "Sexo", "Tabaco", "Diabetes", "HTA",
+    "Dislipemia", "IRC", "Ictus", "Troponina",
+    "Hb", "CK", "FC", "TAS", "ECG", "Colesterol",
+    "PCR", "PCR-us", "IL-6", "FA/Flutter", "FEVI"
+]
+
 # ======================================
 # SCORE
 # ======================================
@@ -178,12 +185,25 @@ odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
 prob_minoca = odds_corrected / (1 + odds_corrected)
 
+prob_minoca = max(0, min(1, prob_minoca))
+prob_obstructivo = 1 - prob_minoca
+
+# ======================================
+# CONTRIBUCIONES
+# ======================================
+
+contribuciones = {
+    name: value * coef
+    for name, value, coef in zip(FEATURE_NAMES, X_scaled, COEF)
+}
+
+contrib_ordenadas = dict(
+    sorted(contribuciones.items(), key=lambda x: abs(x[1]), reverse=True)
+)
+
 # ======================================
 # RESULTADOS
 # ======================================
-
-prob_minoca = max(0, min(1, prob_minoca))
-prob_obstructivo = 1 - prob_minoca
 
 st.divider()
 st.header("Resultado")
@@ -205,9 +225,60 @@ ax2.barh(0, prob_minoca, color="red")
 ax2.set_xlim(0, 1)
 ax2.set_yticks([])
 ax2.set_xlabel("Probabilidad MINOCA")
-ax2.axvline(0.10, color="green", linestyle="--")
-ax2.axvline(0.30, color="orange", linestyle="--")
-
+ax2.axvline(0.10, color="green", linestyle="--", label="Bajo")
+ax2.axvline(0.30, color="orange", linestyle="--", label="Intermedio")
+ax2.legend(loc="upper right")
 st.pyplot(fig2)
+
+# ======================================
+# CONTRIBUYENTES DEL SCORE
+# ======================================
+
+st.subheader("Variables que más contribuyen")
+
+top_n = 8
+labels = list(contrib_ordenadas.keys())[:top_n]
+values = list(contrib_ordenadas.values())[:top_n]
+
+fig3, ax3 = plt.subplots(figsize=(6, 4))
+ax3.barh(labels, values)
+ax3.invert_yaxis()
+ax3.set_xlabel("Contribución al score")
+st.pyplot(fig3)
+
+# ======================================
+# BOXPLOT
+# ======================================
+
+st.subheader("Posición del paciente en la distribución del score")
+
+stats0_full = {
+    'q1': 295.72,
+    'med': 591.33,
+    'q3': 1251.13,
+    'whislo': 83.40,
+    'whishi': 2684.25
+}
+stats1_full = {
+    'q1': 177.95,
+    'med': 293.23,
+    'q3': 465.23,
+    'whislo': 91.66,
+    'whishi': 896.16
+}
+
+fig, ax = plt.subplots()
+
+box_data = [
+    dict(label="Obstructivo", **stats0_full),
+    dict(label="MINOCA", **stats1_full)
+]
+
+ax.bxp(box_data, showfliers=False)
+ax.axhline(score, color="red", linestyle="--", label="Score paciente")
+ax.set_ylabel("Score")
+ax.legend()
+
+st.pyplot(fig)
 
 st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
