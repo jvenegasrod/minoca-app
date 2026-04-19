@@ -1,4 +1,3 @@
 streamlit
 matplotlib
-scikit-learn==1.3.0
-numpy==1.23.5
+numpy
