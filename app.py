@@ -1,6 +1,8 @@
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
+import pickle
+import numpy as np
 
 # ======================================
 # CONFIGURACIÓN
@@ -27,6 +29,12 @@ st.markdown("""
 st.title("Calculadora clínica de probabilidad de MINOCA")
 st.markdown("Introduce los datos clínicos iniciales del paciente con infarto.")
 st.divider()
+
+# ======================================
+# CARGAR SCALER (CLAVE)
+# ======================================
+
+scaler = pickle.load(open("scaler.pkl", "rb"))
 
 # ======================================
 # FUNCIONES
@@ -84,56 +92,54 @@ irc_previo_val = 1 if irc_previo == "Sí" else 0
 ictus_final_val = 1 if ictus_final == "Sí" else 0
 
 # ======================================
+# VECTOR DE INPUT (ORDEN CRÍTICO)
+# ======================================
+
+X_input = np.array([[
+    edad,
+    sexo_val,
+    tabaco_val,
+    diabetes_val,
+    hta_val,
+    dislipemia_val,
+    irc_previo_val,
+    ictus_final_val,
+    troponina_ths,
+    hb,
+    ck,
+    frecuencia_cardiaca,
+    tas,
+    ritmo_en_ecg,
+    colesterol_total,
+    pcr_normal,
+    pcrus_al_ingreso,
+    il_6_a,
+    fevi_cat
+]])
+
+# ======================================
+# ESCALADO (CLAVE)
+# ======================================
+
+X_scaled = scaler.transform(X_input)[0]
+
+# ======================================
 # COEFICIENTES
 # ======================================
 
-COEF = {
-    "edad": 0.198357,
-    "sexo": 1.0,
-    "tabaco": 0.231265,
-    "diabetes": 0.471615,
-    "hta": 0.218579,
-    "dislipemia": 0.395783,
-    "irc_previo": 0.070659,
-    "ictus_final": 0.038478,
-    "troponina_ths": 0.405527,
-    "hb": 0.134931,
-    "ck": 0.208151,
-    "frecuencia_cardiaca": 0.149204,
-    "tas": 0.132517,
-    "ritmo_en_ecg": 0.163148,
-    "colesterol_total": 0.193213,
-    "pcr_normal": 0.098491,
-    "pcrus_al_ingreso": 0.130386,
-    "il_6_a": 0.052608,
-    "fevi_cat": 0.301552
-}
+COEF = [
+    0.198357, 1.0, 0.231265, 0.471615, 0.218579,
+    0.395783, 0.070659, 0.038478, 0.405527,
+    0.134931, 0.208151, 0.149204, 0.132517,
+    0.163148, 0.193213, 0.098491, 0.130386,
+    0.052608, 0.301552
+]
 
 # ======================================
-# SCORE
+# SCORE CORRECTO
 # ======================================
 
-score = sum([
-    edad * COEF["edad"],
-    sexo_val * COEF["sexo"],
-    tabaco_val * COEF["tabaco"],
-    diabetes_val * COEF["diabetes"],
-    hta_val * COEF["hta"],
-    dislipemia_val * COEF["dislipemia"],
-    irc_previo_val * COEF["irc_previo"],
-    ictus_final_val * COEF["ictus_final"],
-    troponina_ths * COEF["troponina_ths"],
-    hb * COEF["hb"],
-    ck * COEF["ck"],
-    frecuencia_cardiaca * COEF["frecuencia_cardiaca"],
-    tas * COEF["tas"],
-    ritmo_en_ecg * COEF["ritmo_en_ecg"],
-    colesterol_total * COEF["colesterol_total"],
-    pcr_normal * COEF["pcr_normal"],
-    pcrus_al_ingreso * COEF["pcrus_al_ingreso"],
-    il_6_a * COEF["il_6_a"],
-    fevi_cat * COEF["fevi_cat"]
-])
+score = sum([x * c for x, c in zip(X_scaled, COEF)])
 
 # ======================================
 # MODELO
@@ -144,62 +150,17 @@ b = -0.0009401927501036586
 
 prob_model = sigmoid(a + b * score)
 
-pi_real = 0.20
+pi_real = 0.10
 odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
 prob_minoca = odds_corrected / (1 + odds_corrected)
 
 # ======================================
-# DISTRIBUCIÓN (MEJORADA)
+# RESULTADOS
 # ======================================
-
-stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13}
-stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23}
-
-med_minoca = stats1['med']
-med_obstructivo = stats0['med']
-
-iqr_minoca = stats1['q3'] - stats1['q1']
-iqr_obstructivo = stats0['q3'] - stats0['q1']
-
-dist_minoca = abs(score - med_minoca) / iqr_minoca
-dist_obstructivo = abs(score - med_obstructivo) / iqr_obstructivo
-
-# afinidad suave
-aff_minoca = math.exp(-dist_minoca)
-aff_obstructivo = math.exp(-dist_obstructivo)
-
-total_aff = aff_minoca + aff_obstructivo
-aff_minoca /= total_aff
-
-# ======================================
-# COMBINACIÓN (AJUSTADA)
-# ======================================
-
-peso_modelo = 0.7
-peso_dist = 0.3
-
-prob_minoca = (peso_modelo * prob_minoca) + (peso_dist * aff_minoca)
-
-# ======================================
-# OVERRIDE SUAVE
-# ======================================
-
-en_box_minoca = stats1['q1'] <= score <= stats1['q3']
-en_box_obstructivo = stats0['q1'] <= score <= stats0['q3']
-
-if en_box_minoca:
-    prob_minoca += 0.05
-
-if en_box_obstructivo:
-    prob_minoca -= 0.05
 
 prob_minoca = max(0, min(1, prob_minoca))
 prob_obstructivo = 1 - prob_minoca
-
-# ======================================
-# RESULTADOS
-# ======================================
 
 st.divider()
 st.header("Resultado")
@@ -225,65 +186,5 @@ ax2.axvline(0.10, color="green", linestyle="--")
 ax2.axvline(0.30, color="orange", linestyle="--")
 
 st.pyplot(fig2)
-
-# ======================================
-# CONTRIBUCIONES
-# ======================================
-
-st.subheader("Variables que más contribuyen")
-
-contribuciones = {
-    "Edad": edad * COEF["edad"],
-    "Sexo": sexo_val * COEF["sexo"],
-    "Tabaco": tabaco_val * COEF["tabaco"],
-    "Diabetes": diabetes_val * COEF["diabetes"],
-    "HTA": hta_val * COEF["hta"],
-    "Dislipemia": dislipemia_val * COEF["dislipemia"],
-    "IRC": irc_previo_val * COEF["irc_previo"],
-    "Ictus": ictus_final_val * COEF["ictus_final"],
-    "Troponina": troponina_ths * COEF["troponina_ths"],
-    "Hb": hb * COEF["hb"],
-    "CK": ck * COEF["ck"],
-    "FC": frecuencia_cardiaca * COEF["frecuencia_cardiaca"],
-    "TAS": tas * COEF["tas"],
-    "ECG": ritmo_en_ecg * COEF["ritmo_en_ecg"],
-    "Colesterol": colesterol_total * COEF["colesterol_total"],
-    "PCR": pcr_normal * COEF["pcr_normal"],
-    "PCR-us": pcrus_al_ingreso * COEF["pcrus_al_ingreso"],
-    "IL-6": il_6_a * COEF["il_6_a"],
-    "FEVI": fevi_cat * COEF["fevi_cat"]
-}
-
-contrib_ordenadas = dict(sorted(contribuciones.items(), key=lambda x: abs(x[1]), reverse=True))
-
-fig3, ax3 = plt.subplots(figsize=(6,4))
-ax3.barh(list(contrib_ordenadas.keys())[:8], list(contrib_ordenadas.values())[:8])
-ax3.invert_yaxis()
-ax3.set_xlabel("Contribución al score")
-
-st.pyplot(fig3)
-
-# ======================================
-# BOXPLOT
-# ======================================
-
-st.subheader("Posición del paciente en la distribución del score")
-
-stats0_full = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13, 'whislo': 83.40, 'whishi': 2684.25}
-stats1_full = {'q1': 177.95, 'med': 293.23, 'q3': 465.23, 'whislo': 91.66, 'whishi': 896.16}
-
-fig, ax = plt.subplots()
-
-box_data = [
-    dict(label="Obstructivo", **stats0_full),
-    dict(label="MINOCA", **stats1_full)
-]
-
-ax.bxp(box_data, showfliers=False)
-ax.axhline(score, color="red", linestyle="--", label="Score paciente")
-ax.set_ylabel("Score")
-ax.legend()
-
-st.pyplot(fig)
 
 st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
