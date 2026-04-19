@@ -144,7 +144,7 @@ b = -0.0009401927501036586
 
 prob_model = sigmoid(a + b * score)
 
-pi_real = 0.10
+pi_real = 0.20
 odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
 prob_minoca = odds_corrected / (1 + odds_corrected)
