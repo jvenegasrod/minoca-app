@@ -147,11 +147,10 @@ prob_model = sigmoid(a + b * score)
 pi_real = 0.10
 odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
-
 prob_minoca = odds_corrected / (1 + odds_corrected)
 
 # ======================================
-# DISTRIBUCIÓN
+# DISTRIBUCIÓN (MEJORADA)
 # ======================================
 
 stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13}
@@ -160,39 +159,40 @@ stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23}
 med_minoca = stats1['med']
 med_obstructivo = stats0['med']
 
-dist_minoca = abs(score - med_minoca)
-dist_obstructivo = abs(score - med_obstructivo)
+iqr_minoca = stats1['q3'] - stats1['q1']
+iqr_obstructivo = stats0['q3'] - stats0['q1']
 
-aff_minoca = 1 / (dist_minoca + 1)
-aff_obstructivo = 1 / (dist_obstructivo + 1)
+dist_minoca = abs(score - med_minoca) / iqr_minoca
+dist_obstructivo = abs(score - med_obstructivo) / iqr_obstructivo
+
+# afinidad suave
+aff_minoca = math.exp(-dist_minoca)
+aff_obstructivo = math.exp(-dist_obstructivo)
 
 total_aff = aff_minoca + aff_obstructivo
 aff_minoca /= total_aff
 
 # ======================================
-# COMBINACIÓN
+# COMBINACIÓN (AJUSTADA)
 # ======================================
 
-peso_modelo = 0.3
-peso_dist = 0.7
+peso_modelo = 0.7
+peso_dist = 0.3
 
 prob_minoca = (peso_modelo * prob_minoca) + (peso_dist * aff_minoca)
 
 # ======================================
-# OVERRIDE
+# OVERRIDE SUAVE
 # ======================================
 
 en_box_minoca = stats1['q1'] <= score <= stats1['q3']
 en_box_obstructivo = stats0['q1'] <= score <= stats0['q3']
 
-cerca_minoca = dist_minoca < dist_obstructivo
-cerca_obstructivo = dist_obstructivo < dist_minoca
+if en_box_minoca:
+    prob_minoca += 0.05
 
-if en_box_minoca and cerca_minoca:
-    prob_minoca = max(prob_minoca, 0.7)
-
-if en_box_obstructivo and cerca_obstructivo:
-    prob_minoca = min(prob_minoca, 0.3)
+if en_box_obstructivo:
+    prob_minoca -= 0.05
 
 prob_minoca = max(0, min(1, prob_minoca))
 prob_obstructivo = 1 - prob_minoca
@@ -221,9 +221,8 @@ ax2.barh(0, prob_minoca, color="red")
 ax2.set_xlim(0,1)
 ax2.set_yticks([])
 ax2.set_xlabel("Probabilidad MINOCA")
-ax2.axvline(0.10, color="green", linestyle="--", label="Bajo")
-ax2.axvline(0.30, color="orange", linestyle="--", label="Intermedio")
-ax2.legend(loc="upper right")
+ax2.axvline(0.10, color="green", linestyle="--")
+ax2.axvline(0.30, color="orange", linestyle="--")
 
 st.pyplot(fig2)
 
