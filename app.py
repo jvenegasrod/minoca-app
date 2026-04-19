@@ -176,8 +176,8 @@ aff_minoca /= total_aff
 # COMBINACIÓN (AJUSTADA)
 # ======================================
 
-peso_modelo = 0.6
-peso_dist = 0.4
+peso_modelo = 0.9
+peso_dist = 0.1
 
 prob_minoca = (peso_modelo * prob_minoca) + (peso_dist * aff_minoca)
 
