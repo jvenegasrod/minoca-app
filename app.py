@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import pickle
 import numpy as np
+import os
 
 # ======================================
 # CONFIGURACIÓN
@@ -31,10 +32,12 @@ st.markdown("Introduce los datos clínicos iniciales del paciente con infarto.")
 st.divider()
 
 # ======================================
-# CARGAR SCALER (CLAVE)
+# CARGAR SCALER
 # ======================================
 
-scaler = pickle.load(open("scaler.pkl", "rb"))
+BASE_DIR = os.path.dirname(__file__)
+scaler_path = os.path.join(BASE_DIR, "scaler.pkl")
+scaler = pickle.load(open(scaler_path, "rb"))
 
 # ======================================
 # FUNCIONES
@@ -65,6 +68,7 @@ hta = st.selectbox("Hipertensión arterial", ["No", "Sí"])
 dislipemia = st.selectbox("Dislipemia", ["No", "Sí"])
 irc_previo = st.selectbox("Insuficiencia renal crónica previa", ["No", "Sí"])
 ictus_final = st.selectbox("Ictus previo", ["No", "Sí"])
+fa_flutter = st.selectbox("FA/Flutter auricular", ["No", "Sí"])  # NUEVO
 
 troponina_ths = parse_float(st.text_input("Troponina T hs"))
 hb = parse_float(st.text_input("Hemoglobina"))
@@ -90,9 +94,10 @@ hta_val = 1 if hta == "Sí" else 0
 dislipemia_val = 1 if dislipemia == "Sí" else 0
 irc_previo_val = 1 if irc_previo == "Sí" else 0
 ictus_final_val = 1 if ictus_final == "Sí" else 0
+fa_flutter_val = 1 if fa_flutter == "Sí" else 0
 
 # ======================================
-# VECTOR DE INPUT (ORDEN CRÍTICO)
+# VECTOR DE INPUT (ORDEN EXACTO DEL MODELO)
 # ======================================
 
 X_input = np.array([[
@@ -114,17 +119,18 @@ X_input = np.array([[
     pcr_normal,
     pcrus_al_ingreso,
     il_6_a,
+    fa_flutter_val,   # ← IMPORTANTE
     fevi_cat
 ]])
 
 # ======================================
-# ESCALADO (CLAVE)
+# ESCALADO
 # ======================================
 
 X_scaled = scaler.transform(X_input)[0]
 
 # ======================================
-# COEFICIENTES
+# COEFICIENTES (20 VARIABLES)
 # ======================================
 
 COEF = [
@@ -132,11 +138,13 @@ COEF = [
     0.395783, 0.070659, 0.038478, 0.405527,
     0.134931, 0.208151, 0.149204, 0.132517,
     0.163148, 0.193213, 0.098491, 0.130386,
-    0.052608, 0.301552
+    0.052608,
+    0.0,        
+    0.301552
 ]
 
 # ======================================
-# SCORE CORRECTO
+# SCORE
 # ======================================
 
 score = sum([x * c for x, c in zip(X_scaled, COEF)])
