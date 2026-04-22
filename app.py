@@ -172,19 +172,55 @@ FEATURE_NAMES = [
 score = sum(x * c for x, c in zip(X_scaled, COEF))
 
 # ======================================
-# MODELO
+# MODELO + AJUSTE POR POSICIÓN DEL SCORE
 # ======================================
 
 a = 0.6233327289350132
 b = -0.0009401927501036586
 
+# Probabilidad logística original
 prob_model = sigmoid(a + b * score)
 
+# Corrección por prevalencia real
 pi_real = 0.10
 odds_model = prob_model / (1 - prob_model)
 odds_corrected = odds_model * (pi_real / (1 - pi_real))
-prob_minoca = odds_corrected / (1 + odds_corrected)
+prob_model_calibrada = odds_corrected / (1 + odds_corrected)
 
+# Distribución clínica del score
+stats0 = {'q1': 295.72, 'med': 591.33, 'q3': 1251.13}   # Obstructivo
+stats1 = {'q1': 177.95, 'med': 293.23, 'q3': 465.23}    # MINOCA
+
+iqr_obstructivo = stats0['q3'] - stats0['q1']
+iqr_minoca = stats1['q3'] - stats1['q1']
+
+# Distancia normalizada a cada grupo
+dist_minoca = abs(score - stats1['med']) / iqr_minoca
+dist_obstructivo = abs(score - stats0['med']) / iqr_obstructivo
+
+# Afinidad suave a cada grupo
+aff_minoca = math.exp(-dist_minoca)
+aff_obstructivo = math.exp(-dist_obstructivo)
+
+prob_dist = aff_minoca / (aff_minoca + aff_obstructivo)
+
+# Combinación:
+# - menos peso al modelo puro
+# - más peso a la posición del score
+peso_modelo = 0.35
+peso_dist = 0.65
+
+prob_minoca = (peso_modelo * prob_model_calibrada) + (peso_dist * prob_dist)
+
+# Empujón suave si cae dentro del rango intercuartílico MINOCA
+if stats1['q1'] <= score <= stats1['q3']:
+    prob_minoca += 0.10
+
+# Penalización suave si cae dentro del rango intercuartílico obstructivo
+if stats0['q1'] <= score <= stats0['q3']:
+    prob_minoca -= 0.05
+
+# Límites finales
 prob_minoca = max(0, min(1, prob_minoca))
 prob_obstructivo = 1 - prob_minoca
 
