@@ -207,8 +207,8 @@ prob_dist = aff_minoca / (aff_minoca + aff_obstructivo)
 # Combinación:
 # - menos peso al modelo puro
 # - más peso a la posición del score
-peso_modelo = 0.35
-peso_dist = 0.65
+peso_modelo = 0.25
+peso_dist = 0.75
 
 prob_minoca = (peso_modelo * prob_model_calibrada) + (peso_dist * prob_dist)
 
