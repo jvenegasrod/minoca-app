@@ -251,38 +251,6 @@ st.subheader("Score total")
 st.metric("Valor del score", f"{score:.2f}")
 
 # ======================================
-# TERMÓMETRO
-# ======================================
-
-st.subheader("Nivel de riesgo")
-
-fig2, ax2 = plt.subplots(figsize=(6, 1))
-ax2.barh(0, prob_minoca, color="red")
-ax2.set_xlim(0, 1)
-ax2.set_yticks([])
-ax2.set_xlabel("Probabilidad MINOCA")
-ax2.axvline(0.10, color="green", linestyle="--", label="Bajo")
-ax2.axvline(0.30, color="orange", linestyle="--", label="Intermedio")
-ax2.legend(loc="upper right")
-st.pyplot(fig2)
-
-# ======================================
-# CONTRIBUYENTES DEL SCORE
-# ======================================
-
-st.subheader("Variables que más contribuyen")
-
-top_n = 8
-labels = list(contrib_ordenadas.keys())[:top_n]
-values = list(contrib_ordenadas.values())[:top_n]
-
-fig3, ax3 = plt.subplots(figsize=(6, 4))
-ax3.barh(labels, values)
-ax3.invert_yaxis()
-ax3.set_xlabel("Contribución al score")
-st.pyplot(fig3)
-
-# ======================================
 # BOXPLOT
 # ======================================
 
@@ -316,5 +284,39 @@ ax.set_ylabel("Score")
 ax.legend()
 
 st.pyplot(fig)
+
+# ======================================
+# TERMÓMETRO
+# ======================================
+
+st.subheader("Nivel de riesgo")
+
+fig2, ax2 = plt.subplots(figsize=(6, 1))
+ax2.barh(0, prob_minoca, color="red")
+ax2.set_xlim(0, 1)
+ax2.set_yticks([])
+ax2.set_xlabel("Probabilidad MINOCA")
+ax2.axvline(0.10, color="green", linestyle="--", label="Bajo")
+ax2.axvline(0.30, color="orange", linestyle="--", label="Intermedio")
+ax2.legend(loc="upper right")
+st.pyplot(fig2)
+
+# ======================================
+# CONTRIBUYENTES DEL SCORE
+# ======================================
+
+st.subheader("Variables que más contribuyen")
+
+top_n = 8
+labels = list(contrib_ordenadas.keys())[:top_n]
+values = list(contrib_ordenadas.values())[:top_n]
+
+fig3, ax3 = plt.subplots(figsize=(6, 4))
+ax3.barh(labels, values)
+ax3.invert_yaxis()
+ax3.set_xlabel("Contribución al score")
+st.pyplot(fig3)
+
+
 
 st.caption("⚠️ Herramienta de apoyo clínico. No sustituye el juicio médico.")
